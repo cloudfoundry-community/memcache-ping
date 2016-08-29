@@ -1,0 +1,12 @@
+---
+spring:
+  pid:
+    file: /tmp/memcache-ping.pid
+
+pingInterval: 5000
+
+memcache:
+  servers:
+  - localhost:54913
+  username: test
+  password: test

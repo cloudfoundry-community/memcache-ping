@@ -1,0 +1,8 @@
+---
+logging:
+  level.cloudfoundry.memcache.ping: INFO
+
+spring:
+  pid:
+    fail-on-write-error: true
+  
