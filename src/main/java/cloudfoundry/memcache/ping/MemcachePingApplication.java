@@ -51,7 +51,7 @@ public class MemcachePingApplication {
 				long time = System.nanoTime();
 				if(key.equals(client.get(key))) {
 					long total = System.nanoTime()-time;
-					LOGGER.info("Success time="+total+"ns");
+					LOGGER.info("Success time_ns="+total);
 				}
 			} finally {
 				client.delete(key);
