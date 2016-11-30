@@ -1,9 +1,6 @@
 package cloudfoundry.memcache.ping;
 
-import java.net.InetSocketAddress;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import javax.validation.Valid;
@@ -14,7 +11,6 @@ import org.hibernate.validator.constraints.NotEmpty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -23,11 +19,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import net.rubyeye.xmemcached.MemcachedClient;
-import net.rubyeye.xmemcached.XMemcachedClientBuilder;
-import net.rubyeye.xmemcached.auth.AuthInfo;
-import net.rubyeye.xmemcached.command.BinaryCommandFactory;
-import net.rubyeye.xmemcached.utils.AddrUtil;
+import net.spy.memcached.AddrUtil;
+import net.spy.memcached.ConnectionFactoryBuilder;
+import net.spy.memcached.ConnectionFactoryBuilder.Protocol;
+import net.spy.memcached.MemcachedClient;
+import net.spy.memcached.auth.AuthDescriptor;
+import net.spy.memcached.auth.PlainCallbackHandler;
 
 @SpringBootApplication
 @EnableScheduling
@@ -46,15 +43,17 @@ public class MemcachePingApplication {
 	public void scheduledTask() {
 		String key = UUID.randomUUID().toString();
 		try {
-			client.set(key, 5, key);
+			client.set(key, 5, key).get();
 			try {
 				long time = System.nanoTime();
 				if(key.equals(client.get(key))) {
 					long total = System.nanoTime()-time;
 					LOGGER.info("SUCCESS time_ns="+total);
+				} else {
+					throw new IllegalStateException("Value returned didn't match expected value.  WHAT IS GOING ON!");
 				}
 			} finally {
-				client.delete(key);
+				client.delete(key).get();
 			}
 		} catch(Exception e) {
 			LOGGER.info("FAILURE msg="+e.getMessage());
@@ -64,22 +63,11 @@ public class MemcachePingApplication {
 	@Bean
 	public MemcachedClient memcache(MemcachePingConfig config) throws Exception {
 
-		List<InetSocketAddress> addresses = AddrUtil.getAddresses(StringUtils.join(config.getMemcache().getServers(), ' '));
-		XMemcachedClientBuilder builder = new XMemcachedClientBuilder(addresses);
-		Map<InetSocketAddress, AuthInfo> authInfo = new HashMap<>();
-		for (InetSocketAddress address : addresses) {
-			authInfo.put(address, AuthInfo.plain(config.getMemcache().getUsername(), config.getMemcache().getPassword()));
-		}
-		builder.setAuthInfoMap(authInfo);
-		builder.setCommandFactory(new BinaryCommandFactory());
-		builder.setConnectTimeout(10000);
-		builder.setOpTimeout(10000);
-		builder.setEnableHealSession(true);
-		builder.setFailureMode(false);
-		MemcachedClient client = builder.build();
-		client.setEnableHeartBeat(true);
-
-		return client;
+		ConnectionFactoryBuilder binaryConnectionFactory = new ConnectionFactoryBuilder();
+		binaryConnectionFactory.setProtocol(Protocol.BINARY);
+		binaryConnectionFactory.setAuthDescriptor(new AuthDescriptor(new String[] {"PLAIN"}, new PlainCallbackHandler(config.getMemcache().getUsername(), config.getMemcache().getPassword())));
+		
+		return new net.spy.memcached.MemcachedClient(binaryConnectionFactory.build(), AddrUtil.getAddresses(StringUtils.join(config.getMemcache().getServers(), ' ')));
 	}
 	
 	@Component
