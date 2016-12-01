@@ -66,7 +66,8 @@ public class MemcachePingApplication {
 		ConnectionFactoryBuilder binaryConnectionFactory = new ConnectionFactoryBuilder();
 		binaryConnectionFactory.setProtocol(Protocol.BINARY);
 		binaryConnectionFactory.setAuthDescriptor(new AuthDescriptor(new String[] {"PLAIN"}, new PlainCallbackHandler(config.getMemcache().getUsername(), config.getMemcache().getPassword())));
-		
+		binaryConnectionFactory.setShouldOptimize(true);
+
 		return new net.spy.memcached.MemcachedClient(binaryConnectionFactory.build(), AddrUtil.getAddresses(StringUtils.join(config.getMemcache().getServers(), ' ')));
 	}
 	
